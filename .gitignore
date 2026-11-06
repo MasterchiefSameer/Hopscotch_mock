@@ -31,7 +31,10 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
+.env.*
+!.env.example
 
 # typescript
 *.tsbuildinfo
@@ -41,3 +44,9 @@ example
 # generated native folders
 /ios
 /android
+
+#agent
+.agents
+skills-lock.json
+skills.json
+prompts/

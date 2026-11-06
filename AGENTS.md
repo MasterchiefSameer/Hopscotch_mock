@@ -1,41 +1,88 @@
-This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
+# Hopscotch
 
-## Expo has changed — do not trust your training data
+Cross-platform kids' and baby fashion e-commerce platform built with React Native and Expo (React Native for Web). Implements a high-performance, Server-Driven UI (SDUI) layout engine powered by dynamic JSON feeds from DummyJSON, providing responsive browsing, category navigation, variant-level pricing, and cart management across Web and Mobile (Android / iOS).
 
-Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:
-
-1. Read the major version of the `expo` package in `package.json`.
-2. Fetch the matching versioned docs: `https://docs.expo.dev/versions/v<major>.0.0/`
-3. For anything else, fetch https://docs.expo.dev/llms.txt — an index of all Expo docs with corrections to common LLM misconceptions. Follow its links to the specific page you need; never answer from memory.
+This file is the project's memory: it holds every decision that is still true. Plans in `prompts/` are history.
 
 ## Commands
 
-Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
-
-```bash
-npx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
-npx expo start              # start the dev server
+~~~bash
+npx expo install <package>  # ALWAYS use instead of npm install: resolves SDK-compatible versions
+npx expo start              # dev server (press w for web, a for android, i for iOS)
+npx expo start --web        # run web directly on browser
 npx expo lint               # lint
-npx tsc --noEmit            # typecheck
+npx tsc --noEmit            # type check
 npx expo-doctor             # diagnose dependency and config issues
 npx expo install --fix      # fix incompatible package versions
-```
+npx eas-cli@latest <cmd>    # EAS builds, submits, and updates (use instead of bare `eas`)
+~~~
 
-Run lint and typecheck before declaring any task done.
+## Expo & Platform
 
-## Navigation & Routing
+- Universal application: must render seamlessly on Web (desktop & mobile browsers) and Mobile (Android / iOS) from a single shared codebase.
+- Routes live in `src/app/`: file-based routing with Expo Router. Keep components, hooks, services, and types strictly outside `src/app/`.
+- `ios/` and `android/` are generated. Never edit them manually; configure native properties in `app.json`.
+- Expo Go only includes bundled native modules. When using custom native modules, run via web preview (`npx expo start --web`) or a development build.
 
-- Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
-- Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
-- Docs: https://docs.expo.dev/router/introduction.md
+## Who owns what
 
-## Building with EAS
+Each tool has one job. Ask before moving a responsibility to a different tool.
 
-Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
-Docs: https://docs.expo.dev/eas/index.md
+- **Data Source & API:** Hosted DummyJSON Custom Response endpoints (`https://dummyjson.com/c/<uuid>`) simulating Hopscotch's `/api/page/v12` (Discover layout) and `/api/products/` (Catalog & PDP). Handled via API service modules in `src/services/api.ts`.
+- **Server-Driven UI (SDUI) Engine:** Dynamic layout factory in `src/components/sdui/` that maps server component types (`Hero`, `category_tree`, `shop_by_occasion`, `COLLECTION`, `CustomTiles`) to concrete UI widgets.
+- **Server State & Caching:** TanStack Query (`@tanstack/react-query`) manages network fetching, background refetching, cache invalidation, and cursor pagination.
+- **Client State & Persistence:** Zustand stores in `src/store/` managing Cart, Wishlist, and Active Filters, persisted to local browser storage (web) and `AsyncStorage` (mobile).
+- **Aspect Ratio & Layout Stability:** Image cards and banners strictly enforce dimension-based aspect ratios (`aspectRatio = width / height`) parsed from incoming API metadata to eliminate Cumulative Layout Shift (CLS).
+- **Styling:** NativeWind v5 (`nativewind@5.0.0-rc.0`, `react-native-css@3.1.0-rc.0`) with Tailwind CSS v4 (`tailwindcss@4.1.12`, `@tailwindcss/postcss@4.1.12`, `lightningcss@1.30.1`), configured via `postcss.config.mjs`, `metro.config.js` (`withNativewind`), `src/global.css`, and typed via `nativewind-env.d.ts`.
+- **Design System:** Single source of truth in `src/theme/` (`colors.ts`, `spacing.ts`, `typography.ts`, `radius.ts`, `shadows.ts`, `motion.ts`) matching the Hopscotch brand:
+  - Palette: Hopscotch Purple (`#67218C`), Hopscotch Pink (`#E91E63`), Playful Navy (`#1A237E`), Sunshine Yellow (`#FFB800`), Soft Teal (`#008A45`), Neutral Dark (`#282C3F`), Neutral Gray (`#757575`), Neutral Border (`#EAEAEC`), Canvas White (`#FFFFFF`), Light Background (`#F8F9FA`).
+  - Shared primitives in `src/components/ui/` (`ThemedText`, `Button`, `Badge`, `ImageCard`, `PriceTag`, `HeaderBar`, `CartBadge`).
+- **Navigation:** Root tabs at `src/app/(tabs)/` (`discover.tsx`, `categories.tsx`, `wishlist.tsx`, `cart.tsx`), Product Listing at `src/app/products/[id].tsx`, and Product Details at `src/app/product/[id].tsx`.
 
 ## Rules
 
-- If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
-- Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
-- Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+- **No Custom Backend Required for Core UI:** The app consumes hosted DummyJSON endpoints directly without an intermediary server. Keep all mock data payloads organized and versioned in `src/data/mock/`.
+- **Zero CLS (Cumulative Layout Shift):** Every banner and image tile must declare explicit aspect ratios from API dimensions (`width` and `height`) before the image binary downloads.
+- **Strict Backward Compatibility in SDUI:** Unknown or unsupported component types from the API must gracefully render `null` with a development warning, never crashing the screen.
+- **Variant Pricing Truth:** Never compute or hardcode single flat prices on the client. Always read variant-specific pricing (`retailPrice`, `regularPrice`, `discount`) from the SKU matrix (`simpleSkus`).
+- **No hardcoded style literals:** Colors, radii, and font sizes must use theme tokens or NativeWind utility classes.
+- Whenever you need input from the user, ask through your tool's built-in question panel so they pick from options instead of typing. Give two to four clear options with the recommended one first. Fall back to plain text only if no such panel exists.
+
+## How we build features
+
+For a new feature or a change across several files. Small fixes and questions skip this.
+
+1. **Understand.** Read the code involved. Open an earlier plan only if this feature builds directly on it (pick by file name). Read current documentation for libraries used.
+2. **Ask.** If a real decision is unclear (scope, visible behavior, data shape), ask in the question panel, batching questions into one round.
+3. **Plan.** Copy `prompts/TEMPLATE.md` to `prompts/NN-feature-name.md` (next number) and fill it in. The plan must be self-contained.
+4. **IMPORTANT: stop and wait.** Write no app code until the user approves the plan. Ask for approval in the question panel. On approval, set `Status: approved`.
+5. **Build** step by step, checking each one. If a step turns out wrong, stop and explain instead of redesigning.
+6. **Close out.**
+   - Run the plan's Verification and give the report described under Reporting.
+   - Add a short `## Result` to the plan and set `Status: done`.
+   - Update this file: put each lasting decision in the section it belongs to. Keep this file under 150 lines.
+
+## Building from designs
+
+Screens must match the Hopscotch brand experience: vibrant, visual-heavy, fast-loading, and mobile-first.
+
+- Test responsive layouts on mobile viewport and desktop web layouts (fluid container with max-width wrapper on desktop).
+- Product cards must show: Image, Brand, Title, Selling Price (₹), Strike-through MRP, Discount badge (% off), and Quick Add / Wishlist trigger.
+- Handle image fallback states (shimmer / skeleton while images resolve).
+
+## Reporting
+
+End every piece of work that changes code with this report:
+
+- **Done:** one line on the outcome, then the files changed and what changed in each.
+- **Verified:** each check with ✅ or ❌ and its evidence.
+- **You need to:** numbered actions only the user can take (e.g., generating new DummyJSON URLs, env settings).
+- **Test it yourself:** numbered steps to reproduce the result from a fresh start.
+- **Notes:** defaults picked, trade-offs, and next steps.
+
+## Checks
+
+- Lint (`npx expo lint`) and type check (`npx tsc --noEmit`) pass before any task is called done.
+- Screens handle loading (skeleton), error, and empty states.
+- Cross-platform verification: runs cleanly on Web (`npx expo start --web`) and Mobile (`npx expo start`).
+- Fallback checks: graceful handling of missing images, zero inventory, or network timeout.
